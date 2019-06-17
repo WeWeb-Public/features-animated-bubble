@@ -1,10 +1,10 @@
 {
-    "name": "hello-world",
+    "name": "features-animated-bubble",
     "type": "section",
     "wewebPublic": "true",
     "repository": {
         "type": "git",
-        "url": "https://github.com/WeWeb-Public/wwSection"
+        "url": "https://github.com/WeWeb-Public/features-animated-bubble"
     },
     "version": "0.0.1",
     "private": true,
