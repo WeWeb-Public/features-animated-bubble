@@ -4,9 +4,9 @@
 
 <!-- This is your HTML -->
 <template>
-    <div class="feature-animated-bubble">
+    <div class="feature-animated-bubble" :style="customStyle">
         <!-- wwManager:start -->
-        <wwSectionEditMenu v-bind:sectionCtrl="sectionCtrl"></wwSectionEditMenu>
+        <wwSectionEditMenu v-bind:sectionCtrl="sectionCtrl" :options="openOptions"></wwSectionEditMenu>
         <!-- wwManager:end -->
         <wwObject class="background" tag="div" :ww-object="section.data.background" ww-category="background"></wwObject>
         <!--TOP WWOBJS-->
@@ -17,7 +17,7 @@
         </div>
 
         <div class="feature-container">
-            <div class="left-block">
+            <div class="left-block" :style="{'z-index': `${section.data.features.length + 1}`}">
                 <wwObject class="background" tag="div" :ww-object="section.data.backgroundLeft" ww-category="background"></wwObject>
 
                 <div class="left-items">
@@ -27,13 +27,18 @@
                     </wwLayoutColumn>
                 </div>
             </div>
-            <div class="right-block">
-                <div class="feature feature-hidden" :data-index="index" v-for="(feature, index) in section.data.features" :key="feature.index">
+            <div class="right-block" v-ww-visible="runAnim" ww-visible-offset="-200">
+                <div class="feature feature-hidden" :data-index="index" v-for="(feature, index) in section.data.features" :key="feature.index" :style="{'transition-delay': `${index * 300}ms`, 'z-index': `${section.data.features.length - index}`}">
                     <div class="icon-container">
+                        <!-- wwManager:start -->
+                        <wwContextMenu tag="div" class="contextmenu" v-if="editMode" @ww-add-before="addFeatureBefore(index)" @ww-add-after="addFeatureAfter(index)" @ww-remove="removeFeature(index)">
+                            <div class="wwi wwi-config"></div>
+                        </wwContextMenu>
+                        <!-- wwManager:end -->
                         <wwObject class="feature-icon" tag="div" :ww-object="feature.icon"></wwObject>
                     </div>
                     <div class="text-container">
-                        <wwObject class="feature-icon" tag="div" :ww-object="feature.text"></wwObject>
+                        <wwObject tag="div" :ww-object="feature.text"></wwObject>
                     </div>
                 </div>
             </div>
@@ -51,6 +56,41 @@
 <!-- This is your Javascript -->
 <!-- ✨ Here comes the magic ✨ -->
 <script>
+/* wwManager:start */
+wwLib.wwPopups.addStory('FEATURE_ANIMATED-BUBBLE_CONFIG', {
+    title: {
+        en: 'Configuration',
+        fr: 'Configuration'
+    },
+    type: 'wwPopupForm',
+    storyData: {
+        fields: [
+            {
+                label: {
+                    en: 'Border Color:',
+                    fr: 'Couleur des bordures :'
+                },
+                type: 'text',
+                key: 'borderColor',
+                valueData: 'borderColor',
+                desc: {
+                    en: 'Example: 2px solid #E53935',
+                    fr: 'Exemple : 2px solid #E53935'
+                }
+            }
+        ]
+    },
+    buttons: {
+        NEXT: {
+            text: {
+                en: 'Ok',
+                fr: 'Ok'
+            },
+            next: false
+        }
+    }
+})
+/* wwManager:end */
 export default {
     name: "__COMPONENT_NAME__",
     props: {
@@ -70,7 +110,13 @@ export default {
         },
         editMode() {
             return this.sectionCtrl.getEditMode() == 'CONTENT'
+        },
+        customStyle() {
+            return {
+                '--borderColor': this.section.data.borderColor,
+            }
         }
+
     },
     created() {
 
@@ -110,8 +156,22 @@ export default {
             this.section.data.leftItems = [];
             needUpdate = true;
         }
+
+        if (!this.section.data.borderColor) {
+            this.section.data.borderColor = '2px solid #E0294D';
+            needUpdate = true;
+        }
         if (!this.section.data.features) {
             this.section.data.features = [{
+                icon: wwLib.wwObject.getDefault({
+                    type: 'ww-icon',
+                    data: {}
+                }),
+                text: wwLib.wwObject.getDefault({
+                    type: 'ww-text',
+                    data: {}
+                })
+            }, {
                 icon: wwLib.wwObject.getDefault({
                     type: 'ww-icon',
                     data: {}
@@ -129,7 +189,7 @@ export default {
         }
     },
     mounted() {
-        this.runAnim()
+        // this.runAnim()
     },
     methods: {
         /* wwManager:start */
@@ -149,17 +209,53 @@ export default {
                 wwLib.wwLog.error('ERROR : ', error);
             }
         },
-        /* wwManager:end */
-        init(section) {
-            $timeout(() => {
-                wwCustomCSS.registerScrollElement({
-                    element: this.$el.find(".right-block"),
-                    fn: this.runAnim
-                });
-            }, 1);
-
+        getNewFeature() {
+            const card = JSON.parse(JSON.stringify(this.section.data.features[0]))
+            wwLib.wwUtils.changeUniqueIds(card)
+            return card
+        },
+        addFeatureBefore(index) {
+            const newCard = this.getNewFeature()
+            this.section.data.features.splice(index, 0, newCard);
+            this.sectionCtrl.update(this.section);
+        },
+        addFeatureAfter(index) {
+            const newCard = this.getNewFeature()
+            this.section.data.features.splice(index + 1, 0, newCard);
+            this.sectionCtrl.update(this.section);
+            this.$nextTick(() => {
+                this.runAnim()
+            });
+        },
+        removeFeature(index) {
+            if (!this.section.data.features.length) {
+                return;
+            }
+            this.section.data.features.splice(index, 1);
+            this.sectionCtrl.update(this.section);
         },
 
+        async openOptions() {
+            let options = {
+                firstPage: 'FEATURE_ANIMATED-BUBBLE_CONFIG',
+                data: {
+                    borderColor: this.section.data.borderColor
+                },
+            }
+            const result = await wwLib.wwPopups.open(options)
+            let updateSection = false;
+            if (result.borderColor) {
+                this.section.data.borderColor = result.borderColor;
+                updateSection = true;
+            }
+            if (updateSection) {
+                this.sectionCtrl.update(this.section);
+            }
+            console.log(result);
+        },
+
+
+        /* wwManager:end */
         runAnim() {
             let features = this.$el.querySelectorAll('.feature')
             console.log('features :', features)
@@ -167,31 +263,9 @@ export default {
                 feature.classList.remove('feature-hidden')
             }
 
-            // this.$el.find(".left-block").css("z-index", this.section.data.features.length + 1);
-
-            // for (var i = 0; i < this.section.data.features.length; i++) {
-            //     this.$el.find("[data-index=" + i + "]").css("transition-delay", (i * 300) + "ms");
-            //     this.$el.find("[data-index=" + i + "]").css("z-index", this.data.features.length - i);
-            // }
-
-            // this.$el.find(".feature").removeClass("feature-hidden");
-        },
-
-        // beforeRerunAnims() {
-        //     return $q(function (resolve) {
-
-        //         this.$el.find(".feature").css("transition-delay", "0ms");
-        //         this.$el.find(".feature").addClass("feature-hidden");
-
-        //         $timeout(() => {
-        //             this.runAnim();
-        //         }, 1000);
-        //         resolve();
-        //     });
-        // }
-
+        }
     }
-};
+}
 </script>
 
 <!-- This is your CSS -->
@@ -247,19 +321,22 @@ export default {
         flex-basis: 100%;
         min-height: 100px;
         position: relative;
-        border-bottom: 2px solid #a9d580;
+        border-bottom: var(--borderColor);
         box-shadow: 0 2px 80px 0 rgba(209, 209, 209, 0.5);
         z-index: 1;
         @media (min-width: 768px) {
             width: 40%;
             flex-basis: 40%;
-            border-right: 2px solid #a9d580;
+            border-right: var(--borderColor);
             border-bottom: none;
         }
     }
 
-    .left-item {
+    .left-items {
         position: relative;
+        .list {
+            width: 100%;
+        }
     }
 
     .right-block {
@@ -272,82 +349,68 @@ export default {
             width: 59%;
             flex-basis: 59%;
         }
-    }
-
-    .feature {
-        position: relative;
-        margin-top: 25px;
-        display: table;
-        vertical-align: middle;
-        width: 100%;
-        opacity: 1;
-        -webkit-transition: all 0.5s ease;
-        -moz-transition: all 0.5s ease;
-        -o-transition: all 0.5s ease;
-        transition: all 0.5s ease;
-        @media (min-width: 768px) {
-            margin-top: 15px;
-            -webkit-transition: all 1s cubic-bezier(0.49, 0.69, 0, 0.96);
-            -moz-transition: all 1s cubic-bezier(0.49, 0.69, 0, 0.96);
-            -o-transition: all 1s cubic-bezier(0.49, 0.69, 0, 0.96);
-            transition: all 1s cubic-bezier(0.49, 0.69, 0, 0.96);
-        }
-    }
-
-    .feature.feature-hidden {
-        opacity: 0;
-        -webkit-transform: translateY(-100%);
-        -moz-transform: translateY(-100%);
-        -o-transform: translateY(-100%);
-        transform: translateY(-100%);
-        @media (min-width: 768px) {
-            -webkit-transform: translateX(-100%);
-            -moz-transform: translateX(-100%);
-            -o-transform: translateX(-100%);
-            transform: translateX(-100%);
-        }
-    }
-
-    .icon-container {
-        display: table-cell;
-        vertical-align: middle;
-        width: 40%;
-        position: relative;
-        @media (min-width: 768px) {
-            content: "";
-
-            height: 0;
-            border-left: none;
-            position: absolute;
-            left: 0;
-
-            width: calc(100% - 30px);
-            border-top: 2px solid #a9d580;
-            position: absolute;
-            top: 50%;
-        }
-    }
-
-    .icon-container {
-        @media (min-width: 768px) {
-            width: 30%;
-            &::before {
-                content: "";
-                height: 100%;
-                border-left: 2px solid #a9d580;
-                position: absolute;
-                left: 50%;
-                top: -25px;
+        .feature {
+            position: relative;
+            margin-top: 25px;
+            display: table;
+            width: 100%;
+            opacity: 1;
+            -webkit-transition: all 0.5s ease;
+            -moz-transition: all 0.5s ease;
+            -o-transition: all 0.5s ease;
+            transition: all 0.5s ease;
+            @media (min-width: 768px) {
+                margin-top: 15px;
+                -webkit-transition: all 1s cubic-bezier(0.49, 0.69, 0, 0.96);
+                -moz-transition: all 1s cubic-bezier(0.49, 0.69, 0, 0.96);
+                -o-transition: all 1s cubic-bezier(0.49, 0.69, 0, 0.96);
+                transition: all 1s cubic-bezier(0.49, 0.69, 0, 0.96);
             }
-        }
-    }
+            &.feature-hidden {
+                opacity: 0;
+                transform: translateY(-100%);
+                @media (min-width: 768px) {
+                    transform: translateX(-100%);
+                }
+            }
+            .icon-container {
+                display: table-cell;
+                vertical-align: middle;
+                width: 40%;
+                position: relative;
+                @media (min-width: 768px) {
+                    width: 30%;
+                }
+                &::before {
+                    content: "";
+                    height: 100%;
+                    border-left: var(--borderColor);
+                    position: absolute;
+                    left: 50%;
+                    top: -25px;
+                    @media (min-width: 768px) {
+                        content: "";
 
-    .text-container {
-        display: table-cell;
-        vertical-align: middle;
-        width: 60%;
-        @media (min-width: 768px) {
-            width: 70%;
+                        height: 0;
+                        border-left: none;
+                        position: absolute;
+                        left: 0;
+
+                        width: calc(100% - 30px);
+                        border-top: var(--borderColor);
+                        position: absolute;
+                        top: 50%;
+                    }
+                }
+            }
+            .text-container {
+                display: table-cell;
+                vertical-align: middle;
+                width: 60%;
+                @media (min-width: 768px) {
+                    width: 70%;
+                }
+            }
         }
     }
 
@@ -361,6 +424,9 @@ export default {
         width: 100%;
         height: 100%;
         position: relative;
+        display: flex;
+        justify-items: center;
+        align-items: center;
     }
 
     .list-container {
@@ -376,5 +442,30 @@ export default {
         @media (min-width: 768px) {
         }
     }
+    /* wwManager:start */
+    .contextmenu {
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform: translate(10px, 6px);
+        width: 30px;
+        height: 30px;
+        color: white;
+        background-color: #ef811a;
+        border-radius: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 1.2rem;
+        cursor: pointer;
+        z-index: 1;
+    }
+    &.ww-editing {
+        .feature-hidden {
+            opacity: 1 !important;
+            transform: none !important;
+        }
+    }
+    /* wwManager:end */
 }
 </style>

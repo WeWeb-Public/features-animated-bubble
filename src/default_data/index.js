@@ -1,11 +1,11 @@
 module.exports = [
     {
-        name: 'my_section',
+        name: 'features',
         storeName: {
-            en_GB: "My first section"
+            en_GB: "Features with animated icons"
         },
         storeDesc: {
-            en_GB: "Template for my first section"
+            en_GB: "Features with animated icons"
         }
     }
 ]
